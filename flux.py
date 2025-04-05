@@ -24,7 +24,7 @@ def initialize_pipeline():
     
     # Optimizations
     # pipe.enable_xformers_memory_efficient_attention()
-    pipe.enable_model_cpu_offload()
+    # pipe.enable_model_cpu_offload()
 
 @app.route('/generate', methods=['GET'])
 def generate_image():
@@ -50,6 +50,9 @@ def generate_image():
             num_inference_steps=steps,
             max_sequence_length=256,
             generator=generator
+    #       height=768,
+    #       width=1360,
+    #       num_images_per_prompt=1,
         ).images[0]
 
         # Print image size for debugging
