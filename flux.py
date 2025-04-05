@@ -11,6 +11,8 @@ app = Flask(__name__)
 
 # Global pipeline instance (loaded once at startup)
 pipe = None
+pipe_lock = threading.Lock()
+initialized = False
 
 # def initialize_pipeline():
 #     global pipe
@@ -28,7 +30,7 @@ pipe = None
     # pipe.enable_model_cpu_offload()
 
 
-pipe_lock = threading.Lock()
+
 
 def get_pipeline():
     global pipe
