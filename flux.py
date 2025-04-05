@@ -5,6 +5,7 @@ from flask import Flask, request, send_file, jsonify
 import torch
 from diffusers import FluxPipeline
 from PIL import Image
+import threading
 
 app = Flask(__name__)
 
