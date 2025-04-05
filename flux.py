@@ -1,4 +1,3 @@
-run_flux1.py
 #!/usr/bin/env python3
 import io
 import time
