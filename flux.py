@@ -11,20 +11,45 @@ app = Flask(__name__)
 # Global pipeline instance (loaded once at startup)
 pipe = None
 
-def initialize_pipeline():
-    global pipe
-    if not torch.cuda.is_available():
-        raise RuntimeError("CUDA not available. Check GPU drivers")
+# def initialize_pipeline():
+#     global pipe
+#     if not torch.cuda.is_available():
+#         raise RuntimeError("CUDA not available. Check GPU drivers")
     
-    pipe = FluxPipeline.from_pretrained(
-        "black-forest-labs/FLUX.1-schnell",
-        torch_dtype=torch.bfloat16,
-        use_safetensors=True
-    ).to("cuda")
+#     pipe = FluxPipeline.from_pretrained(
+#         "black-forest-labs/FLUX.1-schnell",
+#         torch_dtype=torch.bfloat16,
+#         use_safetensors=True
+#     ).to("cuda")
     
     # Optimizations
     # pipe.enable_xformers_memory_efficient_attention()
     # pipe.enable_model_cpu_offload()
+
+
+pipe_lock = threading.Lock()
+
+def get_pipeline():
+    global pipe
+    if pipe is None:
+        with pipe_lock:
+            if pipe is None:  # Double-check locking pattern
+                print("Initializing pipeline...")
+                if not torch.cuda.is_available():
+                    raise RuntimeError("CUDA not available")
+                
+                pipe = FluxPipeline.from_pretrained(
+                    "black-forest-labs/FLUX.1-schnell",
+                    torch_dtype=torch.bfloat16,
+                    use_safetensors=True
+                ).to("cuda")
+                print("Pipeline initialized")
+    return pipe
+
+@app.before_first_request
+def initialize():
+    # Warm up the pipeline on startup
+    get_pipeline()
 
 @app.route('/generate', methods=['GET'])
 def generate_image():
@@ -89,9 +114,9 @@ def health_check():
 
 if __name__ == '__main__':
     # Initialize pipeline before serving
-    print("Initializing pipeline...")
-    initialize_pipeline()
-    print("Pipeline ready, starting server...")
+    # print("Initializing pipeline...")
+    # initialize_pipeline()
+    # print("Pipeline ready, starting server...")
     
     # Start Flask app
     app.run(host='0.0.0.0', port=8080, threaded=True)
