@@ -23,8 +23,8 @@ def initialize_pipeline():
     ).to("cuda")
     
     # Optimizations
-    pipe.enable_xformers_memory_efficient_attention()
-    pipe.enable_model_cpu_offload()
+    # pipe.enable_xformers_memory_efficient_attention()
+    # pipe.enable_model_cpu_offload()
 
 @app.route('/generate', methods=['GET'])
 def generate_image():
@@ -37,6 +37,9 @@ def generate_image():
         guidance_scale = float(request.args.get('guidance_scale', 0.0))
         steps = int(request.args.get('steps', 4))
         seed = int(request.args.get('seed', 42))
+
+        # Print parameters for debugging
+        print(request.args)
         
         # Generate image
         generator = torch.Generator("cuda").manual_seed(seed)
@@ -48,6 +51,9 @@ def generate_image():
             max_sequence_length=256,
             generator=generator
         ).images[0]
+
+        # Print image size for debugging
+        print(f"Generated image size: {image.size}")
         
         # Convert to bytes
         img_io = io.BytesIO()
