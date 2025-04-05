@@ -47,10 +47,17 @@ def get_pipeline():
                 print("Pipeline initialized")
     return pipe
 
-@app.before_first_request
-def initialize():
-    # Warm up the pipeline on startup
+with app.app_context():
     get_pipeline()
+
+@app.teardown_appcontext
+def shutdown(exception=None):
+    global pipe, initialized
+    if initialized:
+        del pipe
+        pipe = None
+        initialized = False
+        torch.cuda.empty_cache()
 
 @app.route('/generate', methods=['GET'])
 def generate_image():
