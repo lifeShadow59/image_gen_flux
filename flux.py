@@ -43,6 +43,7 @@ def generate_image():
         
         # Generate image
         generator = torch.Generator("cuda").manual_seed(seed)
+        print("1")
         image = pipe(
             prompt,
             negative_prompt=negative_prompt,
@@ -54,6 +55,9 @@ def generate_image():
     #       width=1360,
     #       num_images_per_prompt=1,
         ).images[0]
+
+        print("2")
+
 
         # Print image size for debugging
         print(f"Generated image size: {image.size}")
