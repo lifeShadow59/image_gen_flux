@@ -24,7 +24,7 @@ def initialize_pipeline():
     
     # Optimizations
     # pipe.enable_xformers_memory_efficient_attention()
-    # pipe.enable_model_cpu_offload()
+    pipe.enable_model_cpu_offload()
 
 @app.route('/generate', methods=['GET'])
 def generate_image():
