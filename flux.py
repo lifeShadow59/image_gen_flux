@@ -120,7 +120,7 @@ def generate_image_stream():
         try:
             start_time = time.time()
             
-            # Get parameters from query string
+            # Get parameters from query string (in the main function, not callback)
             prompt = request.args.get('prompt', 'A cat holding a sign that says hello world')
             negative_prompt = request.args.get('negative_prompt', '')
             guidance_scale = float(request.args.get('guidance_scale', 0.0))
@@ -130,19 +130,35 @@ def generate_image_stream():
             # Print parameters for debugging
             print(request.args)
             
-            # Generate image with progress reporting
-            generator = torch.Generator("cuda").manual_seed(seed)
-            
             # Create a list to store the last progress to avoid duplicate messages
             last_progress = [-1]
             
+            # Generator function for progress updates
+            def progress_generator():
+                nonlocal last_progress
+                while last_progress[0] < 100:
+                    progress = last_progress[0]
+                    if progress >= 0:
+                        yield f"data: {json.dumps({'progress': progress, 'step': progress * steps // 100, 'total_steps': steps})}\n\n"
+                    time.sleep(0.1)  # Prevent busy waiting
+            
+            # Start progress generator in a separate thread
+            import threading
+            progress_queue = queue.Queue()
+            def run_progress():
+                for progress_update in progress_generator():
+                    progress_queue.put(progress_update)
+                progress_queue.put(None)  # Sentinel value
+            
+            progress_thread = threading.Thread(target=run_progress)
+            progress_thread.start()
+            
+            # Generate image with callback
             def callback(step, timestep, latents):
                 progress = int((step / steps) * 100)
-                if progress != last_progress[0]:
-                    last_progress[0] = progress
-                    yield f"data: {json.dumps({'progress': progress, 'step': step, 'total_steps': steps})}\n\n"
+                last_progress[0] = progress
             
-            # Start image generation
+            generator = torch.Generator("cuda").manual_seed(seed)
             image = pipe(
                 prompt,
                 negative_prompt=negative_prompt,
@@ -150,28 +166,31 @@ def generate_image_stream():
                 num_inference_steps=steps,
                 max_sequence_length=256,
                 generator=generator,
-                callback=lambda step, timestep, latents: [cb for cb in callback(step, timestep, latents)]
+                callback=callback
             ).images[0]
 
+            # Wait for progress thread to finish
+            progress_thread.join()
+            
             # Convert to bytes
             img_io = io.BytesIO()
             image.save(img_io, 'PNG', quality=95)
             img_io.seek(0)
             img_bytes = img_io.getvalue()
             
-            # Send completion message with image data
+            # Send completion message
             gen_time = time.time() - start_time
-            yield f"data: {json.dumps({'progress': 100, 'status': 'complete', 'image_size': len(img_bytes), 'time_taken': gen_time})}\n\n"
+            yield f"data: {json.dumps({'progress': 100, 'status': 'complete', 'time_taken': gen_time})}\n\n"
             
-            # Send the image data (encoded as base64 or in chunks)
-            # Here we'll just send a message that generation is complete
-            # In a real implementation, you might want to send the image data differently
+            # In a real implementation, you might want to:
+            # 1. Return an image ID here
+            # 2. Have a separate endpoint to fetch the image
+            # 3. Or implement a proper binary streaming solution
             
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e), 'status': 'failed'})}\n\n"
     
     return Response(generate(), mimetype='text/event-stream')
-
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
