@@ -117,5 +117,14 @@ def generate_image_stream():
     
     return Response(generate(), mimetype='text/event-stream')
 
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "ready",
+        "cuda_available": torch.cuda.is_available(),
+        "device": str(pipe.device) if pipe else "uninitialized"
+    })
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, threaded=True)
