@@ -45,9 +45,9 @@ with app.app_context():
 
 @app.route('/generate_stream', methods=['GET'])
 def generate_image_stream():
-    # Get all parameters at the start (within request context)
+    # Get parameters within request context
     params = {
-        'prompt': request.args.get('prompt', 'A cat holding a sign that says hello world'),
+        'prompt': request.args.get('prompt', 'A cat holding a sign'),
         'negative_prompt': request.args.get('negative_prompt', ''),
         'guidance_scale': float(request.args.get('guidance_scale', 0.0)),
         'steps': int(request.args.get('steps', 4)),
@@ -58,63 +58,63 @@ def generate_image_stream():
         try:
             start_time = time.time()
             progress_queue = queue.Queue()
+            steps = params['steps']
             
-            # Thread for progress updates
             def image_generation_thread():
                 try:
-                    last_progress = -1
-                    
-                    def callback(step, timestep, latents):
-                        nonlocal last_progress
-                        progress = int((step / params['steps']) * 100)
-                        if progress > last_progress:
-                            progress_queue.put({
-                                'progress': progress,
-                                'step': step,
-                                'total_steps': params['steps']
-                            })
-                            last_progress = progress
-                    
+                    # Create a generator with the specified seed
                     generator = torch.Generator("cuda").manual_seed(params['seed'])
+                    
+                    # Generate the image
                     image = pipe(
-                        params['prompt'],
+                        prompt=params['prompt'],
                         negative_prompt=params['negative_prompt'],
                         guidance_scale=params['guidance_scale'],
-                        num_inference_steps=params['steps'],
+                        num_inference_steps=steps,
                         max_sequence_length=256,
-                        generator=generator,
-                        callback=callback
+                        generator=generator
                     ).images[0]
                     
                     # Convert to bytes
                     img_io = io.BytesIO()
-                    image.save(img_io, 'PNG', quality=95)
+                    image.save(img_io, 'PNG')
                     img_io.seek(0)
-                    img_bytes = img_io.getvalue()
                     
                     progress_queue.put({
                         'status': 'complete',
-                        'image_bytes': img_bytes.hex(),  # Send as hex for demo
+                        'image_data': img_io.getvalue().hex(),
                         'time_taken': time.time() - start_time
                     })
-                    
                 except Exception as e:
                     progress_queue.put({'error': str(e), 'status': 'failed'})
-            
-            # Start the generation thread
+
+            # Start generation thread
             threading.Thread(target=image_generation_thread).start()
-            
-            # Stream progress updates
+
+            # Simulate progress updates since FluxPipeline doesn't support callbacks
+            for i in range(steps + 1):
+                time.sleep(0.5)  # Simulate processing time per step
+                progress = int((i / steps) * 100)
+                progress_queue.put({
+                    'progress': progress,
+                    'step': i,
+                    'total_steps': steps
+                })
+                
+                if progress >= 100:
+                    break
+
+            # Stream updates
             while True:
                 update = progress_queue.get()
                 if update.get('status') in ['complete', 'failed']:
                     yield f"data: {json.dumps(update)}\n\n"
                     break
                 yield f"data: {json.dumps(update)}\n\n"
-                
+
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e), 'status': 'failed'})}\n\n"
-    
+
     return Response(generate(), mimetype='text/event-stream')
 
 
