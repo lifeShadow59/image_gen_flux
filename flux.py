@@ -35,13 +35,13 @@ def get_pipeline():
 with app.app_context():
     get_pipeline()
 
-@app.teardown_appcontext
-def shutdown(exception=None):
-    global pipe
-    if pipe is not None:
-        del pipe
-        pipe = None
-        torch.cuda.empty_cache()
+# @app.teardown_appcontext
+# def shutdown(exception=None):
+#     global pipe
+#     if pipe is not None:
+#         del pipe
+#         pipe = None
+#         torch.cuda.empty_cache()
 
 @app.route('/generate_stream', methods=['GET'])
 def generate_image_stream():
